@@ -1,9 +1,9 @@
+# /app/api/v1/api.py
 from fastapi import APIRouter
-from app.api.v1.endpoints import rag
+# Renamed from 'rag' to 'reppy' to better suit the application
+from app.reppy import endpoints as reppy_endpoints
 
-# Create the main router for the v1 API
 api_router = APIRouter()
 
-# Include the rag endpoint router
-# All routes from the rag module will be included here.
-api_router.include_router(rag.router, prefix="/rag", tags=["RAG"])
+# Include the main application endpoints
+api_router.include_router(reppy_endpoints.router, prefix="/reppy", tags=["Reppy"])

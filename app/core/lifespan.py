@@ -1,7 +1,9 @@
 # /app/core/lifespan.py
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.rag.chain import create_rag_chain
+from langchain_openai import ChatOpenAI
+from app.core.config import settings
+from app.core.state import AppState
 import logging
 
 # Configure logging
@@ -12,24 +14,34 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Lifespan context manager for the FastAPI application.
-    This function is executed on application startup and shutdown.
-    It's the ideal place to initialize resources like models, database connections, etc.
+    Lifespan manager to initialize and store the AI models on application startup.
     """
-    logger.info("Application startup: Initializing RAG chain...")
+    logger.info("Application startup: Initializing AI models for Reppy...")
 
-    # On startup, create the RAG chain and store it in the app's state.
-    # This ensures the model and retriever are loaded only once, improving performance.
+    app.state = AppState()
+
     try:
-        app.state.rag_chain = create_rag_chain()
-        logger.info("RAG chain initialized successfully.")
+        # Initialize the two required models for Reppy's features
+        routine_generator_model = ChatOpenAI(
+            model=settings.ROUTINE_GENERATOR_LLM,
+            temperature=settings.LLM_TEMPERATURE,
+            api_key=settings.OPENAI_API_KEY
+        )
+        coach_model = ChatOpenAI(
+            model=settings.COACH_LLM,
+            temperature=settings.LLM_TEMPERATURE,
+            api_key=settings.OPENAI_API_KEY
+        )
+        # Store them in the state dictionary with clear keys
+        app.state.models = {
+            "routine_generator": routine_generator_model,
+            "coach": coach_model
+        }
+
+        logger.info("AI models initialized successfully.")
     except Exception as e:
-        logger.error(f"Failed to initialize RAG chain: {e}")
-        # You might want to handle this more gracefully, e.g., by preventing the app from starting.
-        app.state.rag_chain = None
+        logger.error(f"Failed to initialize AI models: {e}")
 
-    yield  # The application is now running
+    yield
 
-    # On shutdown, you can add cleanup code here if needed.
-    logger.info("Application shutdown: Cleaning up resources...")
-    app.state.rag_chain = None  # Clear the state
+    logger.info("Application shutdown.")

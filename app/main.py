@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from contextlib import asynccontextmanager
 from app.core.lifespan import lifespan
 from app.api.v1.api import api_router
 from app.core.config import settings
@@ -21,4 +20,3 @@ async def read_root():
     A simple root endpoint to confirm the server is running.
     """
     return {"message": "Welcome to the LangChain RAG API Server"}
-
