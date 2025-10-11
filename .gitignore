@@ -1,6 +1,32 @@
+# Environment variables
 .env
+.env.local
+
+# Virtual environments
 /.venv
+venv/
+env/
+
+# IDEs
 /.idea
 /.vscode
 /.cursor
+
+# Python
 /**/__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
