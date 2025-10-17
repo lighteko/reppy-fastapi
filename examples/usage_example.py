@@ -1,5 +1,11 @@
 """Usage examples for Reppy RAG pipeline."""
 
+import sys
+from pathlib import Path
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import asyncio
 from src.config import get_config
 from src.common.prompts import load_prompt, list_prompts
