@@ -2,6 +2,23 @@
 
 This repository contains the complete Python AI service for the Reppy fitness application.
 
+## 🚀 LangChain Refactoring Complete
+
+This project has been refactored to utilize **LangChain** for all AI operations. See [README.LANGCHAIN.md](README.LANGCHAIN.md) for detailed documentation on:
+
+- LangChain Tools for function calling (`calculate_one_rep_max`, `get_exercise_details`)
+- LangChain Agents with ReAct-style reasoning
+- LangChain Qdrant integration for vector search
+- LangChain OpenAI for streaming and structured output
+- Complete 5-step workflow implementation from `generate_routine.yaml`
+
+**New LangChain Components:**
+- `src/common/langchain_tools.py` - Structured tools with Pydantic schemas
+- `src/common/langchain_agent.py` - ReAct agents for complex reasoning
+- `src/common/langchain_orchestrator.py` - RAG orchestration with LangChain
+- `src/common/langchain_chat.py` - Streaming chat service
+- `examples/langchain_usage.py` - Usage examples
+
 ## ✅ Implementation Complete
 
 The service has been fully implemented using **LangChain** and following these critical design principles:
@@ -15,28 +32,27 @@ All prompts sent to the LLM must be loaded from external YAML files for easy man
 The service will have two modes of operation: a FastAPI server for real-time requests and a background worker for asynchronous jobs from AWS SQS.
 
 1. Project Structure
-Organize the code into the following file structure:
+   Organize the code into the following file structure:
 
 /reppy-ai-service
 |
 |-- /src
-|   |-- /common
-|   |   |-- __init__.py
-|   |   |-- clients.py          # Initializes Qdrant, OpenAI clients
-|   |   |-- express_client.py   # HTTP client to talk to the Express API
-|   |   |-- models.py           # Pydantic data models
-|   |   |-- orchestrator.py     # Core RAG orchestration logic
-|   |
-|   |-- api.py                  # FastAPI web server
-|   |-- worker.py               # SQS background worker
+| |-- /common
+| | |-- **init**.py
+| | |-- clients.py # Initializes Qdrant, OpenAI clients
+| | |-- express_client.py # HTTP client to talk to the Express API
+| | |-- models.py # Pydantic data models
+| | |-- orchestrator.py # Core RAG orchestration logic
+| |
+| |-- api.py # FastAPI web server
+| |-- worker.py # SQS background worker
 |
 |-- /prompts
-|   |-- generate_routine.yaml   # Prompt template for routine generation
-|   |-- chat_response.yaml      # Prompt template for the chatbot
+| |-- generate_routine.yaml # Prompt template for routine generation
+| |-- chat_response.yaml # Prompt template for the chatbot
 |
 |-- requirements.txt
-|-- .env.example
-2. Shared Logic (src/common)
+|-- .env.example 2. Shared Logic (src/common)
 clients.py:
 
 Initialize singleton clients for OpenAI and QdrantClient using environment variables.
@@ -82,8 +98,8 @@ The format is written below:
 ```YAML
 version: 1.0.0
 prompt:
-  prompt_type: # 
-  tools: [] # valid functions to prevent value hallucinations.  
+  prompt_type: #
+  tools: [] # valid functions to prevent value hallucinations.
   variables: [] # The varibles will be given by default. Reason yourself what varibles might be needed.
   role: | # Write valid role description here.
     dummy text
@@ -96,7 +112,7 @@ prompt:
 
 You can add keys to the prompt if needed.
 
-The schema below is how the AI-generated routine data are handled in Express API server. 
+The schema below is how the AI-generated routine data are handled in Express API server.
 
 ```TypeScript
 export const UpdateProgramSchema = z.object({
@@ -146,10 +162,10 @@ export const CreateRoutineSchema = z.object({
 });
 ```
 
-The  AI generated routines should be in form of CreateBatchRoutinesSchema. For sure, the id part won't be handled by the AI, so you should exclude them in the response schema.
+The AI generated routines should be in form of CreateBatchRoutinesSchema. For sure, the id part won't be handled by the AI, so you should exclude them in the response schema.
 
 4. FastAPI Server (src/api.py)
-Use FastAPI.
+   Use FastAPI.
 
 Create a POST /chat/stream endpoint that accepts a ChatRequest model.
 
@@ -158,7 +174,7 @@ It should load its prompt from /prompts/chat_response.yaml.
 It will call the OpenAI API with stream: true and return a StreamingResponse.
 
 5. SQS Worker (src/worker.py)
-Use boto3 to poll an AWS SQS queue.
+   Use boto3 to poll an AWS SQS queue.
 
 When a generate_program job is received:
 
@@ -173,14 +189,14 @@ After the Express API confirms the save, delete the message from the SQS queue.
 Include robust error handling.
 
 6. Dependencies (requirements.txt)
-Please include: fastapi, uvicorn, boto3, openai, qdrant-client, pydantic, httpx (for the Express client), and PyYAML (for loading prompts).
+   Please include: fastapi, uvicorn, boto3, openai, qdrant-client, pydantic, httpx (for the Express client), and PyYAML (for loading prompts).
 
 7. This service will be uploaded initailly as a docker container to AWS Lambda.
 
 8. The Qdrant Collection Schema is below:
 
 ```JSON
-// exercises 
+// exercises
 {
     "vectors": {
       "size": "{your_embedding_dimension}",

@@ -1,0 +1,287 @@
+version: 0.7.0
+prompt_type: generate_program
+
+# Defines tools the AI can call to get more information from your application.
+# The user_id has been removed, as the application layer is responsible for user context.
+tools:
+  - name: calculate_one_rep_max
+    description: >-
+      Calculates a user's estimated one-rep max (1RM) for a specific
+      exercise based on their recent workout history. Use this when you need to
+      program weights based on a percentage of the user's maximum strength.
+    parameters:
+      type: object
+      required: [exercise_code]
+      properties:
+        exercise_code:
+          type: string
+          description: "The code of the exercise, e.g., 'BARBELL_BENCH_PRESS'."
+
+  - name: get_exercise_details
+    description: >-
+      Retrieves detailed information for a single exercise, including primary
+      and secondary muscles, detailed instructions, and safety cues. Use this if
+      you need more context before recommending an exercise, especially in
+      relation to a user's constraints.
+    parameters:
+      type: object
+      required: [exercise_code]
+      properties:
+        exercise_code:
+          type: string
+          description: "The code of the exercise to look up."
+
+  - name: get_exercise_performance_records
+    description: >-
+      Retrieves detailed performance records for a single exercise, including
+      the user's actual reps, weight, and rest time from past workouts. Use this
+      tool to apply progressive overload based on demonstrated performance.
+    parameters:
+      type: object
+      required: [exercise_code]
+      properties:
+        exercise_code:
+          type: string
+          description: "The code of the exercise to look up."
+
+# All the contextual information your application will provide to the LLM.
+variables:
+  - name: user_profile
+    description: "The user's biographical data, goals, and preferences."
+    schema:
+      type: object
+      properties:
+        goal:
+          type: string
+          description: "The user's primary training goal, e.g., HYPERTROPHY, STRENGTH."
+          example: "HYPERTROPHY"
+        experience_level:
+          type: string
+          description: "The user's self-assessed experience level, e.g., BEGINNER, INTERMEDIATE."
+          example: "INTERMEDIATE"
+        unit_system:
+          type: string
+          description: "The user's preferred unit system for weight and height. (CM_KG or IN_LB)"
+          example: "CM_KG"
+        locale:
+          type: string
+          description: "The user's preferred language for generated text. (en-US, ko-KR)"
+          example: "en-US"
+        body_weight:
+          type: number
+          description: "User's current body weight in their preferred unit system."
+          example: 70.0
+        height:
+          type: number
+          description: "User's current height in their preferred unit system."
+          example: 180.0
+        birthdate:
+          type: string
+          format: "date"
+          description: "User's date of birth in YYYY-MM-DD format."
+          example: "1990-01-01"
+        sex:
+          type: string
+          description: "User's biological sex. (MALE, FEMALE, N/A)"
+          example: "MALE"
+
+  - name: job_context
+    description: "The specific parameters for this generation job."
+    schema:
+      type: object
+      properties:
+        program_name:
+          type: string
+          description: "The name for the program being generated."
+        start_date:
+          type: string
+          format: "date"
+          description: "The start date of the program in YYYY-MM-DD format."
+          example: "2025-10-13"
+        goal_date:
+          type: string
+          format: "date"
+          description: "The goal date of the program in YYYY-MM-DD format."
+          example: "2025-11-24"
+        additional_info:
+          type: string
+          description: "Additional natural language context or constraints from the user."
+          example: "My right shoulder is injured, so I can't do any overhead exercises."
+
+  - name: available_context
+    description: "The ONLY exercises and set types the AI is allowed to use. This acts as a menu."
+    schema:
+      type: object
+      properties:
+        exercises:
+          type: array
+          items:
+            type: object
+            properties:
+              exercise_code: { type: string, example: "BARBELL_BENCH_PRESS" }
+              main_muscle_code: { type: string, example: "CHEST" }
+        set_types:
+          type: array
+          items:
+            type: object
+            properties:
+              set_type_code: { type: string, example: "NORMAL" }
+
+  - name: current_routines
+    description: "The routines the user is currently performing. Use this as a baseline for the new program."
+    schema:
+      type: array
+      items:
+        type: object
+        properties:
+          routine_name: { type: string, example: "PUSH DAY" }
+          routine_order: { type: number, example: 1 }
+          plans:
+            type: array
+            description: "The sequence of exercises performed in this routine."
+            items:
+              type: object
+              properties:
+                exercise_code: { type: string, example: "BARBELL_BENCH_PRESS" }
+                plan_order: { type: number, example: 1 }
+                sets:
+                  type: array
+                  description: "The sets performed for this exercise."
+                  items:
+                    type: object
+                    properties:
+                      set_type_code: { type: string, example: "WARMUP" }
+                      set_order: { type: number, example: 1 }
+                      reps: { type: ["number", "null"], example: 8 }
+                      weight: { type: ["number", "null"], example: 60 }
+                      rest_time: { type: number, example: 60 }
+                      duration: { type: ["number", "null"], example: null }
+
+# The persona the AI should adopt.
+role: |
+  You are Reppy, an elite strength and conditioning coach. Your sole purpose is to
+  craft evidence-backed, periodized workout programming that is safe, effective,
+  and perfectly aligned with the user's profile and available context.
+
+# The core instructions, broken down into a guided thinking process.
+instruction: |
+  Follow this process precisely to generate the user's next workout program.
+
+  **Step 1: Analyze the User and Goal.**
+  Review the `user_profile` and `job_context` to form a complete picture of the
+  user's needs, experience, and the goal of this new program block.
+  ---
+  USER PROFILE:
+  {user_profile_json}
+  ---
+  JOB CONTEXT:
+  {job_context_json}
+  ---
+
+  **Step 2: Analyze Current Program as a Baseline.**
+  Review the `current_routines`. This is what the user has been doing. Your task
+  is to create the *next logical progression* from this baseline.
+  ---
+  CURRENT ROUTINES:
+  {current_routines_json}
+  ---
+
+  **Step 3: Use Tools to Inform Progression.**
+  For key compound exercises in the `current_routines`, use the `get_exercise_performance_records`
+  tool to see how the user actually performed. Use this data to apply the
+  principle of progressive overload. If you need to calculate a new 1RM to
+  set percentage-based weights, use the `calculate_one_rep_max` tool.
+
+  **Step 4: Review Available Context.**
+  Examine the `available_context`. The `exercises` listed are the only ones
+  you are permitted to use for any new exercise selections.
+  ---
+  AVAILABLE CONTEXT:
+  {available_context_json}
+  ---
+
+  **Step 5: Construct the New, Progressed Routines.**
+  Design the new program. It should be a thoughtful evolution of the `current_routines`.
+  Increase weights or reps where the user has shown progress. Consider exercise
+  variations if needed. Ensure the program remains balanced and safe, respecting
+  any constraints in `additional_info`.
+
+  **Step 6: Final JSON Assembly.**
+  Assemble the complete new program into a single JSON object that strictly
+  adheres to the `response_schema`.
+
+  **Strict Output Rules:**
+  - You MUST only use exercise and set type **codes** exactly as they appear in the AVAILABLE CONTEXT.
+  - You MUST NOT fabricate any identifiers or codes.
+  - Your FINAL response MUST be a single, raw JSON object. DO NOT wrap it in markdown ```json. DO NOT add any conversational text, introductions, or explanations before or after the JSON structure itself.
+
+# The required output format.
+response_type: JSON
+response_schema:
+  type: object
+  required:
+    - routines
+  properties:
+    routines:
+      type: array
+      description: "A list of all routines in the program."
+      items:
+        type: object
+        required:
+          - routine_name
+          - routine_order
+          - plans
+        properties:
+          routine_name:
+            type: string
+            description: "A descriptive name for the routine, e.g., 'Push Day A'."
+          routine_order:
+            type: integer
+            description: "The sequence order for this routine in the cycle (1, 2, 3...)."
+          notes:
+            type: string
+            description: "Optional overall notes for the entire routine."
+          plans:
+            type: array
+            description: "The sequence of exercises to be performed in this routine."
+            items:
+              type: object
+              required:
+                - exercise_code
+                - plan_order
+                - sets
+              properties:
+                exercise_code:
+                  type: string
+                  description: "Code of the exercise, MUST match a code from `available_context.exercises`."
+                plan_order:
+                  type: integer
+                  description: "The sequence order for this exercise within the routine."
+                notes:
+                  type: string
+                  description: "Optional notes for this specific exercise, e.g., 'Focus on a slow eccentric'."
+                sets:
+                  type: array
+                  description: "The sets to be performed for this exercise."
+                  items:
+                    type: object
+                    required:
+                      - set_order
+                      - rest_time
+                    properties:
+                      set_type_code:
+                        type: string
+                        description: "Code of the set type, MUST match a code from `available_context.set_types`."
+                      set_order:
+                        type: integer
+                      reps:
+                        type: integer
+                      weight:
+                        type: number
+                        description: "Weight in the user's preferred unit system."
+                      rest_time:
+                        type: integer
+                        description: "Rest time in seconds."
+                      duration:
+                        type: integer
+                        description: "Duration in seconds (for timed exercises like planks)."
