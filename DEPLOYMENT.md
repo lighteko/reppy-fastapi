@@ -375,11 +375,126 @@ aws logs tail /aws/lambda/reppy-rag-processor --follow
 docker-compose logs -f api
 ```
 
+## Qdrant Infrastructure Setup
+
+### Qdrant Cloud (Recommended for Production)
+
+1. **Create Account**
+   - Go to [Qdrant Cloud](https://cloud.qdrant.io/)
+   - Create a new cluster
+   - Get connection details (URL + API Key)
+
+2. **Configure Environment**
+   ```bash
+   QDRANT_URL=https://your-cluster.cloud.qdrant.io
+   QDRANT_API_KEY=your-api-key
+   QDRANT_GRPC=false
+   ```
+
+3. **Create Collections**
+   ```python
+   from qdrant_client import QdrantClient
+   from qdrant_client.models import Distance, VectorParams
+   
+   client = QdrantClient(
+       url="https://your-cluster.cloud.qdrant.io",
+       api_key="your-api-key"
+   )
+   
+   # Exercises collection
+   client.create_collection(
+       collection_name="exercises",
+       vectors_config=VectorParams(
+           size=1536,  # text-embedding-3-small
+           distance=Distance.COSINE
+       )
+   )
+   
+   # User memory collection
+   client.create_collection(
+       collection_name="user_memory",
+       vectors_config=VectorParams(
+           size=1536,
+           distance=Distance.COSINE
+       )
+   )
+   ```
+
+4. **Verify Setup**
+   ```bash
+   curl -H "api-key: YOUR_KEY" \
+     https://your-cluster.cloud.qdrant.io/collections
+   ```
+
+### Local Qdrant (Development Only)
+
+```bash
+# Start Qdrant
+docker run -d \
+  -p 6333:6333 \
+  -p 6334:6334 \
+  -v $(pwd)/qdrant_storage:/qdrant/storage \
+  --name qdrant \
+  qdrant/qdrant:latest
+
+# Configure
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=  # Leave empty
+
+# Verify
+curl http://localhost:6333/collections
+```
+
+### Collection Schemas
+
+**Exercises Collection:**
+```json
+{
+  "source_id": "uuid",
+  "exercise_code": "string",
+  "name": "string",
+  "main_muscle_id": "uuid",
+  "equipment_id": "uuid",
+  "difficulty_level": "integer"
+}
+```
+
+**User Memory Collection:**
+```json
+{
+  "source_id": "uuid",
+  "user_id": "uuid",
+  "created_at": "datetime",
+  "memory_type": "string",
+  "content": "string"
+}
+```
+
+### Populating Data
+
+See example script in DEVELOPER_GUIDE.md for migrating data from PostgreSQL to Qdrant.
+
+### Qdrant Monitoring
+
+```bash
+# Check collections
+curl -H "api-key: YOUR_KEY" \
+  https://your-cluster.cloud.qdrant.io/collections
+
+# Check collection size
+curl -H "api-key: YOUR_KEY" \
+  https://your-cluster.cloud.qdrant.io/collections/exercises/points/count
+
+# Create snapshot (backup)
+curl -X POST -H "api-key: YOUR_KEY" \
+  https://your-cluster.cloud.qdrant.io/collections/exercises/snapshots
+```
+
 ## Support
 
 For issues or questions:
-1. Check the main README.md
-2. Review test files for usage examples
-3. Check logs for error details
-4. Open an issue on GitHub
+1. Check [README.md](README.md) for overview
+2. Check [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for detailed development info
+3. Review test files for usage examples
+4. Check logs for error details
 
