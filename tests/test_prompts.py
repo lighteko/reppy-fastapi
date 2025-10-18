@@ -3,7 +3,8 @@
 import pytest
 from pathlib import Path
 
-from src.common.prompts import PromptLoader, load_prompt, list_prompts
+from src.common.utils.prompts import PromptLoader
+from src.common import load_prompt, list_prompts
 
 
 def test_prompt_loader_discovery():

@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 
-from src.common.rag_retriever import QdrantRetriever
+from src.common import QdrantRetriever
 
 
 @pytest.fixture

@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.common.action_router_llm import LLMActionRouter, route_input_llm
+from src.common import LLMActionRouter, route_input_llm
 
 
 class TestLLMActionRouter:
@@ -18,7 +18,7 @@ class TestLLMActionRouter:
     @pytest.fixture
     def router(self, mock_llm):
         """Create a router with mock LLM."""
-        with patch("src.common.action_router_llm.load_prompt") as mock_load:
+        with patch("src.common.pipeline.router.load_prompt") as mock_load:
             # Mock the routing prompt
             mock_load.return_value = {
                 "role": "You are an intent classifier.",
@@ -145,7 +145,7 @@ class TestLLMActionRouter:
     @pytest.mark.asyncio
     async def test_no_routing_prompt_fallback(self, mock_llm):
         """Test fallback when routing prompt is not found."""
-        with patch("src.common.action_router_llm.load_prompt") as mock_load:
+        with patch("src.common.pipeline.router.load_prompt") as mock_load:
             mock_load.side_effect = FileNotFoundError("action_routing.yaml not found")
             router = LLMActionRouter(llm=mock_llm)
             
@@ -187,7 +187,7 @@ class TestLLMActionRouter:
 @pytest.mark.asyncio
 async def test_route_input_llm_convenience_function():
     """Test the convenience function for routing."""
-    with patch("src.common.action_router_llm.get_llm_router") as mock_get:
+    with patch("src.common.pipeline.router.get_llm_router") as mock_get:
         mock_router = AsyncMock()
         mock_router.route.return_value = ("chat_response", {"method": "llm"})
         mock_get.return_value = mock_router

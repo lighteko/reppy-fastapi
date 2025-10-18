@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.common.validation import (
+from src.common import (
     ChatResponse,
     GenerateProgramResponse,
     UpdateRoutineResponse,

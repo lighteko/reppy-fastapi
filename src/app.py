@@ -6,7 +6,7 @@ from loguru import logger
 
 from src.api.routers import router
 from src.config import get_config
-from src.common.observability import setup_logging
+from src.common import setup_logging
 
 
 # Initialize logging
