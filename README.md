@@ -204,27 +204,14 @@ uvicorn src.app:app --reload --host 0.0.0.0 --port 8000
 
 ### API Endpoints
 
-#### Mode A: Route and Execute
+#### Mode A: Route and Execute (LLM-based)
 
-**Pattern-based routing (default):**
 ```bash
 curl -X POST http://localhost:8000/api/v1/route \
   -H "Content-Type: application/json" \
   -d '{
     "input": "I want to generate a new workout program",
     "user_id": "user-123",
-    "context": {...}
-  }'
-```
-
-**LLM-based routing (intelligent, context-aware):**
-```bash
-curl -X POST http://localhost:8000/api/v1/route \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input": "I want to generate a new workout program",
-    "user_id": "user-123",
-    "use_llm_router": true,
     "context": {
       "conversation_history": [
         {"role": "user", "content": "Previous message..."}
@@ -233,7 +220,7 @@ curl -X POST http://localhost:8000/api/v1/route \
   }'
 ```
 
-See [LLM_ROUTER_GUIDE.md](LLM_ROUTER_GUIDE.md) for details on LLM-based routing.
+The router uses LLM-based intent classification for intelligent, context-aware routing. See [LLM_ROUTER_GUIDE.md](LLM_ROUTER_GUIDE.md) for details.
 
 #### Mode B: Direct Execute
 
