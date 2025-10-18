@@ -8,7 +8,6 @@ from .observability import setup_logging, setup_langsmith, ReppyCallbackHandler
 from .lcel_pipeline import build_lcel_pipeline, build_streaming_pipeline
 from .agent_builder import build_tool_calling_agent, build_simple_llm_chain
 from .executor import make_agent_executor, run_agent_with_retry
-from .action_router import ActionRouter, route_input, get_router
 from .action_router_llm import LLMActionRouter, route_input_llm, route_input_llm_sync, get_llm_router
 
 __all__ = [
@@ -36,10 +35,6 @@ __all__ = [
     # Executor
     "make_agent_executor",
     "run_agent_with_retry",
-    # Router
-    "ActionRouter",
-    "route_input",
-    "get_router",
     # LLM Router
     "LLMActionRouter",
     "route_input_llm",
