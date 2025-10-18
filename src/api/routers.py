@@ -11,6 +11,7 @@ from loguru import logger
 
 from src.common.prompts import load_prompt, list_prompts
 from src.common.action_router import route_input
+from src.common.action_router_llm import route_input_llm
 from src.common.tools import ReppyTools
 from src.common.agent_builder import build_tool_calling_agent
 from src.common.executor import make_agent_executor, run_agent_with_retry
@@ -28,6 +29,7 @@ class ModeARequest(BaseModel):
     user_id: str = Field(description="User ID for context")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Additional context variables")
     stream: bool = Field(default=False, description="Whether to stream the response")
+    use_llm_router: bool = Field(default=False, description="Use LLM-based routing instead of pattern matching")
 
 
 class ModeBRequest(BaseModel):
@@ -164,11 +166,19 @@ async def mode_a_route_and_execute(request: ModeARequest):
     Returns:
         Execution result.
     """
-    logger.info(f"Mode A request from user {request.user_id}")
+    logger.info(f"Mode A request from user {request.user_id} (use_llm_router={request.use_llm_router})")
     
     # Route to appropriate prompt
-    prompt_key, scores = route_input(request.input, request.context)
-    logger.info(f"Routed to prompt: {prompt_key} (scores: {scores})")
+    if request.use_llm_router:
+        # Use LLM-based routing
+        prompt_key, metadata = await route_input_llm(request.input, request.context)
+        logger.info(f"LLM routed to prompt: {prompt_key} (metadata: {metadata})")
+        routing_info = metadata
+    else:
+        # Use pattern-based routing
+        prompt_key, scores = route_input(request.input, request.context)
+        logger.info(f"Pattern routed to prompt: {prompt_key} (scores: {scores})")
+        routing_info = scores
     
     # Execute pipeline
     result = await execute_pipeline(
@@ -177,6 +187,12 @@ async def mode_a_route_and_execute(request: ModeARequest):
         user_id=request.user_id,
         context=request.context,
     )
+    
+    # Add routing info to result
+    if "metadata" not in result:
+        result["metadata"] = {}
+    result["metadata"]["routing_method"] = "llm" if request.use_llm_router else "pattern"
+    result["metadata"]["routing_info"] = routing_info
     
     return ExecutionResponse(**result)
 

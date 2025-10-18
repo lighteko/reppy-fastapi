@@ -157,8 +157,8 @@ async def example_mode_b():
     }
     
     print("Executing pipeline...")
-    # result = await pipeline.ainvoke(pipeline_input)
-    # print(f"\nResult: {result}")
+    result = await pipeline.ainvoke(pipeline_input)
+    print(f"\nResult: {result}")
     
     await express_client.close()
     print("\nMode B complete!")
@@ -233,11 +233,11 @@ async def main():
     # Run examples
     await example_list_prompts()
     await example_router_analysis()
-    await example_health_check()
+    # await example_health_check()
     
     # These require actual LLM/API access
     # await example_mode_a()
-    # await example_mode_b()
+    await example_mode_b()
     
     print("\n" + "="*50)
     print("  Examples complete!")

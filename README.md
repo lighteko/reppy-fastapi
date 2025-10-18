@@ -112,7 +112,8 @@ reppy-fastapi/
 │   │   ├── lcel_pipeline.py # LCEL assembly
 │   │   ├── agent_builder.py # Agent construction
 │   │   ├── executor.py      # AgentExecutor wrapper
-│   │   └── action_router.py # Input routing
+│   │   ├── action_router.py # Pattern-based routing
+│   │   └── action_router_llm.py # LLM-based routing
 │   ├── api/                 # FastAPI endpoints
 │   │   ├── __init__.py
 │   │   └── routers.py
@@ -123,6 +124,7 @@ reppy-fastapi/
 ├── tests/                   # Test suite
 │   ├── test_prompts.py
 │   ├── test_router.py
+│   ├── test_llm_router.py
 │   ├── test_qdrant_client.py
 │   ├── test_express_client.py
 │   ├── test_validation.py
@@ -204,18 +206,34 @@ uvicorn src.app:app --reload --host 0.0.0.0 --port 8000
 
 #### Mode A: Route and Execute
 
+**Pattern-based routing (default):**
 ```bash
 curl -X POST http://localhost:8000/api/v1/route \
   -H "Content-Type: application/json" \
   -d '{
     "input": "I want to generate a new workout program",
     "user_id": "user-123",
+    "context": {...}
+  }'
+```
+
+**LLM-based routing (intelligent, context-aware):**
+```bash
+curl -X POST http://localhost:8000/api/v1/route \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": "I want to generate a new workout program",
+    "user_id": "user-123",
+    "use_llm_router": true,
     "context": {
-      "user_profile": {...},
-      "job_context": {...}
+      "conversation_history": [
+        {"role": "user", "content": "Previous message..."}
+      ]
     }
   }'
 ```
+
+See [LLM_ROUTER_GUIDE.md](LLM_ROUTER_GUIDE.md) for details on LLM-based routing.
 
 #### Mode B: Direct Execute
 
