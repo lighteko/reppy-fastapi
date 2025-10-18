@@ -7,7 +7,7 @@ from langchain_core.tools import StructuredTool
 from loguru import logger
 
 from src.infra.express_client import ExpressAPIClient
-from src.common.rag_retriever import QdrantRetriever
+from src.common.tools.retriever import QdrantRetriever
 
 
 # Tool Input Schemas

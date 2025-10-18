@@ -9,7 +9,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from loguru import logger
 
 from src.config import get_config
-from src.common.observability import ReppyCallbackHandler
+from src.common.utils.observability import ReppyCallbackHandler
 
 
 def make_agent_executor(

@@ -8,7 +8,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from loguru import logger
 
-from src.common.prompts import load_prompt, list_prompts
+from src.common.utils.prompts import load_prompt, list_prompts
 from src.config import get_config
 
 
