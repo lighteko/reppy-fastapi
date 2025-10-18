@@ -8,13 +8,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import asyncio
 from src.config import get_config
-from src.common.prompts import load_prompt, list_prompts
-from src.common.action_router import route_input
-from src.common.tools import ReppyTools
-from src.common.agent_builder import build_tool_calling_agent
-from src.common.executor import make_agent_executor
-from src.common.lcel_pipeline import build_lcel_pipeline
-from src.common.rag_retriever import QdrantRetriever
+from src.common import (
+    load_prompt,
+    list_prompts,
+    route_input_llm_sync,
+    ReppyTools,
+    build_tool_calling_agent,
+    make_agent_executor,
+    build_lcel_pipeline,
+    QdrantRetriever,
+)
 from src.infra.express_client import ExpressAPIClient
 from src.infra.qdrant_client import QdrantVectorDB
 
@@ -28,9 +31,9 @@ async def example_mode_a():
     user_id = "test-user-123"
     
     # Route to appropriate prompt
-    prompt_key, scores = route_input(user_input)
+    prompt_key, metadata = route_input_llm_sync(user_input)
     print(f"Routed to: {prompt_key}")
-    print(f"Scores: {scores}\n")
+    print(f"Metadata: {metadata}\n")
     
     # Load prompt
     prompt_data = load_prompt(prompt_key)
@@ -196,10 +199,10 @@ async def example_router_analysis():
     ]
     
     for user_input in test_inputs:
-        prompt_key, scores = route_input(user_input)
+        prompt_key, metadata = route_input_llm_sync(user_input)
         print(f"Input: '{user_input}'")
         print(f"  → Routed to: {prompt_key}")
-        print(f"  → Scores: {scores}\n")
+        print(f"  → Metadata: {metadata}\n")
 
 
 async def example_health_check():

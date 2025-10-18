@@ -7,7 +7,7 @@ from pathlib import Path
 # Add project to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.common.action_router_llm import route_input_llm
+from src.common import route_input_llm
 
 
 async def test_router():

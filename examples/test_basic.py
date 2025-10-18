@@ -14,10 +14,10 @@ def test_imports():
         from src.config import get_config
         print("[OK] Config module imported")
         
-        from src.common.prompts import list_prompts
+        from src.common import list_prompts
         print("[OK] Prompts module imported")
         
-        from src.common.action_router import route_input
+        from src.common import route_input_llm_sync
         print("[OK] Action router imported")
         
         print("\nAll imports successful!")
@@ -57,7 +57,7 @@ def test_prompts():
     print("\nTesting prompt system...")
     
     try:
-        from src.common.prompts import list_prompts, load_prompt
+        from src.common import list_prompts, load_prompt
         
         # List prompts
         prompts = list_prompts()
@@ -82,7 +82,7 @@ def test_router():
     print("\nTesting action router...")
     
     try:
-        from src.common.action_router import route_input
+        from src.common import route_input_llm_sync
         
         test_cases = [
             ("Generate a new workout program", "generate_program"),
@@ -91,7 +91,7 @@ def test_router():
         ]
         
         for input_text, expected in test_cases:
-            prompt_key, scores = route_input(input_text)
+            prompt_key, metadata = route_input_llm_sync(input_text)
             status = "[OK]" if prompt_key == expected else "[WARN]"
             print(f"{status} '{input_text[:40]}...' -> {prompt_key} (expected: {expected})")
         
