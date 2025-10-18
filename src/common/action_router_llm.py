@@ -31,15 +31,16 @@ class LLMActionRouter:
         """
         self.config = config or get_config()
         
-        # Initialize LLM
+        # Initialize LLM with lightweight model for routing
         if llm is None:
             self.llm = ChatOpenAI(
-                model=self.config.llm_model,
+                model=self.config.router_llm_model,  # Use lightweight model
                 temperature=0.0,  # Use 0 for classification
                 max_tokens=100,  # Only need a short response
                 openai_api_key=self.config.openai_api_key,
                 timeout=self.config.llm_timeout,
             )
+            logger.info(f"Router initialized with model: {self.config.router_llm_model}")
         else:
             self.llm = llm
         

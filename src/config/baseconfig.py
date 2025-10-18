@@ -23,6 +23,9 @@ class Config(BaseSettings):
     llm_max_tokens: int = Field(default=4096, ge=1, description="Maximum tokens for LLM response")
     openai_api_key: str = Field(default="", description="OpenAI API key")
     
+    # Router LLM Settings (lightweight model for intent classification)
+    router_llm_model: str = Field(default="gpt-4o-mini", description="Lightweight model for action routing")
+    
     # Embedding Settings
     embedding_model: str = Field(default="text-embedding-3-small", description="Embedding model name")
     embedding_dimension: int = Field(default=1536, description="Embedding vector dimension")
