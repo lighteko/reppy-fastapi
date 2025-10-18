@@ -43,7 +43,7 @@ async def compare_routers():
         # LLM routing
         llm_key, llm_meta = await route_input_llm(input_text)
         
-        match = "✓" if pattern_key == llm_key else "✗"
+        match = "[OK]" if pattern_key == llm_key else "[DIFF]"
         if pattern_key == llm_key:
             matches += 1
         
@@ -90,18 +90,18 @@ async def compare_routers():
     
     print("""
 Pattern-Based Router:
-  ✓ Fast (<1ms)
-  ✓ Deterministic
-  ✓ No API costs
-  ✗ Limited context awareness
-  ✗ Requires regex maintenance
+  + Fast (<1ms)
+  + Deterministic
+  + No API costs
+  - Limited context awareness
+  - Requires regex maintenance
   
 LLM-Based Router:
-  ✓ Context-aware (uses conversation history)
-  ✓ Natural language understanding
-  ✓ Higher accuracy (~90%+)
-  ✗ Slower (~500-1500ms)
-  ✗ Requires API calls (~$0.0001/request)
+  + Context-aware (uses conversation history)
+  + Natural language understanding
+  + Higher accuracy (~90%+)
+  - Slower (~500-1500ms)
+  - Requires API calls (~$0.0001/request)
     """)
     
     print("="*60)
