@@ -1,0 +1,34 @@
+{
+  "requestId": "req-update-001",
+  "userId": "user-12345",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "푸쉬데이 벤치프레스 세트 수 좀 줄여줘. 5세트는 너무 많아."
+    }
+  ],
+  "stream": false,
+  "metadata": {
+    "routine_name": "Push Day A",
+    "update_request": {
+      "routine_name": "Push Day A",
+      "additional_info": "벤치프레스 세트 수를 줄여주세요. 5세트에서 3세트로."
+    },
+    "available_context": {
+      "exercises": [
+        {"exercise_code": "BARBELL_BENCH_PRESS", "main_muscle_code": "CHEST"},
+        {"exercise_code": "INCLINE_DUMBBELL_PRESS", "main_muscle_code": "CHEST"},
+        {"exercise_code": "CABLE_CROSSOVER", "main_muscle_code": "CHEST"},
+        {"exercise_code": "OVERHEAD_PRESS", "main_muscle_code": "SHOULDERS"},
+        {"exercise_code": "LATERAL_RAISE", "main_muscle_code": "SHOULDERS"},
+        {"exercise_code": "TRICEP_PUSHDOWN", "main_muscle_code": "TRICEPS"}
+      ],
+      "set_types": [
+        {"set_type_code": "WARMUP"},
+        {"set_type_code": "NORMAL"},
+        {"set_type_code": "DROP"}
+      ]
+    }
+  }
+}
+

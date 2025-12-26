@@ -1,1 +1,2 @@
-"""Reppy AI service package."""
+"""Reppy Worker source package."""
+

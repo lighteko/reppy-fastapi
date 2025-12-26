@@ -1,2 +1,2 @@
-"""Test suite for Reppy RAG pipeline."""
+"""Tests for Reppy Worker."""
 

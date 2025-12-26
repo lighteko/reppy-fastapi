@@ -1,0 +1,17 @@
+{
+  "requestId": "req-sample-001",
+  "userId": "user-12345",
+  "conversation_history": [
+    {
+      "role": "system",
+      "content": "You are Reppy, a friendly fitness coach."
+    },
+    {
+      "role": "user",
+      "content": "오늘 운동 뭐 해야 돼?"
+    }
+  ],
+  "stream": true,
+  "metadata": {}
+}
+
