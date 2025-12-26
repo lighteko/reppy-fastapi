@@ -70,10 +70,49 @@ class Config(BaseSettings):
     langsmith_api_key: Optional[str] = Field(default=None, description="LangSmith API key")
     langsmith_project: Optional[str] = Field(default="reppy-rag", description="LangSmith project name")
     
-    # AWS Settings (for Lambda)
-    aws_region: str = Field(default="us-east-1", description="AWS region")
-    aws_access_key_id: Optional[str] = Field(default=None, description="AWS access key")
-    aws_secret_access_key: Optional[str] = Field(default=None, description="AWS secret key")
+    # OCI Authentication Settings
+    oci_region: str = Field(default="us-ashburn-1", description="OCI region")
+    oci_tenancy_ocid: Optional[str] = Field(default=None, description="OCI tenancy OCID")
+    oci_user_ocid: Optional[str] = Field(default=None, description="OCI user OCID")
+    oci_fingerprint: Optional[str] = Field(default=None, description="OCI API key fingerprint")
+    oci_private_key_path: Optional[str] = Field(default=None, description="OCI API private key path")
+    oci_private_key_passphrase: Optional[str] = Field(default=None, description="OCI API key passphrase")
+
+    # OCI Resource Principal Settings (Functions/Cloud Shell/Compute)
+    oci_resource_principal_version: Optional[str] = Field(
+        default=None,
+        description="OCI resource principal version (e.g., 2.2)"
+    )
+    oci_resource_principal_region: Optional[str] = Field(
+        default=None,
+        description="OCI resource principal region"
+    )
+    oci_resource_principal_rpst: Optional[str] = Field(
+        default=None,
+        description="OCI resource principal RPST"
+    )
+    oci_resource_principal_private_pem: Optional[str] = Field(
+        default=None,
+        description="OCI resource principal private PEM"
+    )
+
+    # OCI Functions Settings
+    oci_functions_endpoint: Optional[str] = Field(default=None, description="OCI Functions endpoint URL")
+    oci_functions_application_ocid: Optional[str] = Field(
+        default=None,
+        description="OCI Functions application OCID"
+    )
+
+    # OCIR Settings
+    ocir_registry: Optional[str] = Field(default=None, description="OCIR registry hostname")
+    ocir_namespace: Optional[str] = Field(default=None, description="OCIR namespace")
+    ocir_repository: Optional[str] = Field(default=None, description="OCIR repository name")
+    ocir_username: Optional[str] = Field(default=None, description="OCIR username")
+    ocir_password: Optional[str] = Field(default=None, description="OCIR auth token/password")
+
+    # OCI Queue Settings
+    oci_queue_ocid: Optional[str] = Field(default=None, description="OCI Queue OCID")
+    oci_queue_endpoint: Optional[str] = Field(default=None, description="OCI Queue endpoint URL")
 
 
 # Singleton instance
@@ -101,4 +140,3 @@ def reload_config() -> Config:
     global _config
     _config = Config()
     return _config
-
