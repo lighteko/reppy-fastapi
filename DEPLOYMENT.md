@@ -4,7 +4,7 @@
 
 1. [Local Development](#local-development)
 2. [Docker Deployment](#docker-deployment)
-3. [AWS Lambda Deployment](#aws-lambda-deployment)
+3. [OCI Functions Deployment](#oci-functions-deployment)
 4. [Production Considerations](#production-considerations)
 
 ## Local Development
@@ -113,90 +113,75 @@ docker run -d \
 docker logs -f reppy-api
 ```
 
-## AWS Lambda Deployment
+## OCI Functions Deployment
 
 ### Prerequisites
 
-- AWS CLI configured
-- ECR repository created
-- IAM role for Lambda with appropriate permissions
+- OCI CLI configured
+- OCIR (Oracle Cloud Infrastructure Registry) repository created
+- OCI Functions application/network configured
 - Remote Qdrant instance (Qdrant Cloud recommended)
-- Express API server accessible from Lambda
+- Express API server accessible from Functions
 
-### Build Lambda Image
+**Container/handler details:**
+- Dockerfile: `Dockerfile`
+- Handler entrypoint: `src.consumer.lambda_handler.handler` (set in `CMD`)
+
+### Build and Push Function Image (OCIR)
 
 ```bash
-# Build the Lambda image
-docker build -f Dockerfile -t reppy-lambda:latest .
+# Build the function image
+docker build -f Dockerfile -t reppy-functions:latest .
 
-# Tag for ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
+# (Optional) create an OCIR repository if you don't have one yet
+oci artifacts container repository create \
+  --compartment-id <compartment-ocid> \
+  --display-name reppy-functions
 
-docker tag reppy-lambda:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/reppy-lambda:latest
+# Log in to OCIR (username is <tenancy-namespace>/<user>)
+docker login <region>.ocir.io \
+  --username <tenancy-namespace>/<user> \
+  --password <auth-token>
 
-# Push to ECR
-docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/reppy-lambda:latest
+# Tag for OCIR
+docker tag reppy-functions:latest <region>.ocir.io/<tenancy-namespace>/reppy-functions/reppy-fastapi:latest
+
+# Push to OCIR
+docker push <region>.ocir.io/<tenancy-namespace>/reppy-functions/reppy-fastapi:latest
 ```
 
-### Create Lambda Function
+### Create Functions Application and Function
 
-**Using AWS CLI:**
+**Using OCI CLI:**
 
 ```bash
-aws lambda create-function \
-  --function-name reppy-rag-processor \
-  --package-type Image \
-  --code ImageUri=<account-id>.dkr.ecr.us-east-1.amazonaws.com/reppy-lambda:latest \
-  --role arn:aws:iam::<account-id>:role/lambda-execution-role \
-  --timeout 300 \
-  --memory-size 2048 \
-  --environment Variables='{
-    OPENAI_API_KEY=your-key,
-    QDRANT_URL=https://your-qdrant-instance,
-    EXPRESS_BASE_URL=https://your-express-api
-  }'
+oci fn application create \
+  --compartment-id <compartment-ocid> \
+  --display-name reppy-rag-app \
+  --subnet-ids '["<subnet-ocid>"]'
+
+oci fn function create \
+  --application-id <app-ocid> \
+  --display-name reppy-rag-processor \
+  --image <region>.ocir.io/<tenancy-namespace>/reppy-functions/reppy-fastapi:latest \
+  --memory-in-mbs 2048 \
+  --timeout-in-seconds 300 \
+  --config '{"OPENAI_API_KEY":"your-key","QDRANT_URL":"https://your-qdrant-instance","EXPRESS_BASE_URL":"https://your-express-api"}'
 ```
 
-### Configure SQS Trigger
+### Configure Event Source
 
-**Create SQS queue:**
+Set up your event source (OCI Queue, Streaming, or API Gateway) to invoke the
+function. For example, with OCI Queue you can configure the queue-trigger in the
+Functions application console or via OCI CLI to route messages to
+`reppy-rag-processor`.
 
-```bash
-aws sqs create-queue \
-  --queue-name reppy-rag-jobs \
-  --attributes VisibilityTimeout=900
-```
-
-**Add SQS trigger to Lambda:**
+### Check Function Logs
 
 ```bash
-aws lambda create-event-source-mapping \
-  --function-name reppy-rag-processor \
-  --event-source-arn arn:aws:sqs:us-east-1:<account-id>:reppy-rag-jobs \
-  --batch-size 1
-```
-
-### Test Lambda Function
-
-**Send test message to SQS:**
-
-```bash
-aws sqs send-message \
-  --queue-url https://sqs.us-east-1.amazonaws.com/<account-id>/reppy-rag-jobs \
-  --message-body '{
-    "job_type": "generate_program",
-    "payload": {
-      "user_id": "test-user",
-      "program_id": "test-program",
-      "context": {...}
-    }
-  }'
-```
-
-**Check Lambda logs:**
-
-```bash
-aws logs tail /aws/lambda/reppy-rag-processor --follow
+oci fn function log list \
+  --application-id <app-ocid> \
+  --function-id <function-ocid>
 ```
 
 ## Production Considerations
@@ -497,4 +482,3 @@ For issues or questions:
 2. Check [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for detailed development info
 3. Review test files for usage examples
 4. Check logs for error details
-
