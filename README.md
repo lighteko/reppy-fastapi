@@ -58,7 +58,7 @@ curl http://localhost:8000/api/v1/health
 ### Production Ready
 - ✅ FastAPI with async support
 - ✅ Pydantic v2 schemas for validation
-- ✅ AWS Lambda consumer for SQS job processing
+- ✅ OCI Functions consumer for async job processing
 - ✅ Health checks for all dependencies
 - ✅ Loguru-based logging with rotation
 - ✅ Optional LangSmith tracing
@@ -78,7 +78,7 @@ src/
 ├── api/                     # FastAPI routers
 ├── infra/                   # External clients (Qdrant, Express)
 ├── config/                  # Configuration management
-└── consumer/                # AWS Lambda handler
+└── consumer/                # OCI Functions handler
 ```
 
 ### Request Flow
@@ -193,7 +193,7 @@ python examples/usage_example.py   # Requires API keys
 - **Validation**: Pydantic v2
 - **Logging**: Loguru
 - **Testing**: Pytest
-- **Deployment**: Docker, AWS Lambda
+- **Deployment**: Docker, OCI Functions
 
 ## 📄 License
 
