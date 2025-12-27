@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -44,14 +45,13 @@ class PromptTemplate:
                 rendered_vars[f"{key}_json"] = str(value)
             rendered_vars[key] = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
 
-        # Render instruction with variables
-        try:
-            rendered_instruction = self.instruction.format(**rendered_vars)
-        except KeyError as e:
-            logger.warning(f"Missing template variable: {e}")
-            rendered_instruction = self.instruction
+        # Render only {identifier} placeholders.
+        # Do NOT use str.format() because prompts often contain literal braces like "{}"
+        # (e.g., JSON examples) which would raise IndexError/KeyError.
+        rendered_role = _safe_brace_substitute(self.role, rendered_vars)
+        rendered_instruction = _safe_brace_substitute(self.instruction, rendered_vars)
 
-        return self.role.strip(), rendered_instruction.strip()
+        return rendered_role.strip(), rendered_instruction.strip()
 
     def get_schema_json(self) -> str:
         """Get response schema as JSON string."""
@@ -151,4 +151,24 @@ class PromptLoader:
     def clear_cache(self) -> None:
         """Clear the template cache."""
         self._cache.clear()
+
+
+_PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
+
+
+def _safe_brace_substitute(template: str, values: dict[str, str]) -> str:
+    """
+    Substitute only placeholders matching {identifier}.
+
+    This avoids breaking on literal braces used in prompts (e.g., "{}" or "{ \"k\": 1 }").
+    Unknown placeholders are left as-is.
+    """
+
+    def repl(match: re.Match[str]) -> str:
+        key = match.group(1)
+        if key in values:
+            return values[key]
+        return match.group(0)
+
+    return _PLACEHOLDER_RE.sub(repl, template)
 

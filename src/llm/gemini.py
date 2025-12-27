@@ -4,7 +4,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from enum import Enum
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
@@ -102,22 +102,19 @@ class GeminiClient:
         try:
             # Invoke model
             response: AIMessage = await model.ainvoke(messages)
-            content = response.content
+            content_text = self._content_to_text(response.content)
 
-            if isinstance(content, str):
-                # Clean up response - remove markdown code blocks if present
-                content = self._clean_json_response(content)
-                
-                # Parse JSON
-                try:
-                    data = json.loads(content)
-                    return output_model.model_validate(data)
-                except json.JSONDecodeError as e:
-                    logger.warning(f"JSON decode error: {e}")
-                    # Try parser as fallback
-                    return parser.parse(content)
-            else:
-                raise ValueError(f"Unexpected response type: {type(content)}")
+            # Clean up response - remove markdown code blocks if present
+            content_text = self._clean_json_response(content_text)
+
+            # Parse JSON
+            try:
+                data = json.loads(content_text)
+                return output_model.model_validate(data)
+            except json.JSONDecodeError as e:
+                logger.warning(f"JSON decode error: {e}")
+                # Try parser as fallback (it may extract JSON-like blocks)
+                return parser.parse(content_text)
 
         except ValidationError as e:
             logger.error(f"Validation error parsing LLM output: {e}")
@@ -150,7 +147,7 @@ class GeminiClient:
 
         async for chunk in model.astream(messages):
             if hasattr(chunk, "content") and chunk.content:
-                yield str(chunk.content)
+                yield self._content_to_text(cast(Any, chunk.content))
 
     async def invoke_streaming_structured(
         self,
@@ -202,6 +199,40 @@ class GeminiClient:
             content = content[:-3]
 
         return content.strip()
+
+    def _content_to_text(self, content: Any) -> str:
+        """
+        Convert LangChain AIMessage/Chunk content to plain text.
+
+        langchain can return:
+        - str
+        - list[dict|str] (multipart / rich content)
+        """
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for p in content:
+                if p is None:
+                    continue
+                if isinstance(p, str):
+                    parts.append(p)
+                    continue
+                if isinstance(p, dict):
+                    # Common patterns: {"type":"text","text":"..."} or {"text":"..."}
+                    text = p.get("text")
+                    if isinstance(text, str):
+                        parts.append(text)
+                        continue
+                    # If it’s not a text part, keep a compact representation for debugging/parsing.
+                    parts.append(json.dumps(p, ensure_ascii=False))
+                    continue
+                parts.append(str(p))
+            return "".join(parts)
+        # Fallback: stringify
+        return str(content)
 
 
 class StreamingCollector[T: BaseModel]:

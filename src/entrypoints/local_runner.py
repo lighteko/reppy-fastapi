@@ -103,10 +103,26 @@ async def run_local(payload_path: str | None, payload_json: str | None) -> None:
 
     # Load payload
     if payload_path:
-        with open(payload_path) as f:
+        with open(payload_path, encoding="utf-8") as f:
             payload_data = json.load(f)
     elif payload_json:
-        payload_data = json.loads(payload_json)
+        # Convenience: allow "-j ./payload.json" (treat as file path) or "-j @./payload.json"
+        candidate = payload_json.strip()
+        if candidate.startswith("@"):
+            candidate = candidate[1:].strip()
+
+        p = Path(candidate)
+        if p.exists() and p.is_file() and p.suffix.lower() in {".json"}:
+            with open(p, encoding="utf-8") as f:
+                payload_data = json.load(f)
+        else:
+            try:
+                payload_data = json.loads(payload_json)
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    "Invalid JSON passed to -j/--json. "
+                    "If you meant a file path, use -f/--file or pass '-j @path/to/file.json'."
+                ) from e
     else:
         # Read from stdin
         logger.info("Reading payload from stdin (enter JSON, then Ctrl+D):")
@@ -148,6 +164,14 @@ async def run_local(payload_path: str | None, payload_json: str | None) -> None:
 
 def main() -> None:
     """Main entry point for local runner."""
+    # On Windows consoles, ensure UTF-8 so Korean text prints correctly.
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+            sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
     parser = argparse.ArgumentParser(
         description="Reppy Worker Local Runner",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -158,6 +182,10 @@ Examples:
 
   # Run with inline JSON
   python -m src.entrypoints.local_runner -j '{"requestId": "...", ...}'
+
+  # Convenience: treat -j as a file path
+  python -m src.entrypoints.local_runner -j ./payload.json
+  python -m src.entrypoints.local_runner -j @./payload.json
 
   # Run with stdin
   cat payload.json | python -m src.entrypoints.local_runner
@@ -171,7 +199,7 @@ Examples:
     parser.add_argument(
         "-j", "--json",
         type=str,
-        help="JSON string with request payload",
+        help="JSON string with request payload (or a .json file path; prefix with '@' to force file mode)",
     )
     
     args = parser.parse_args()

@@ -3,11 +3,16 @@
 import base64
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import oci
-from oci.streaming import StreamClient
-from oci.streaming.models import PutMessagesDetails, PutMessagesDetailsEntry
+if TYPE_CHECKING:
+    import oci  # noqa: F401
+    from oci.streaming import StreamClient  # noqa: F401
+    from oci.streaming.models import PutMessagesDetails, PutMessagesDetailsEntry  # noqa: F401
+else:
+    StreamClient = Any  # type: ignore[assignment]
+    PutMessagesDetails = Any  # type: ignore[assignment]
+    PutMessagesDetailsEntry = Any  # type: ignore[assignment]
 
 from src.config import Settings
 from src.contracts.messages import TokenStreamEvent
@@ -39,6 +44,10 @@ class OCITokenStreamer(TokenStreamer):
     def _get_client(self) -> StreamClient:
         """Get or create OCI Streaming client."""
         if self._client is None:
+            # Import OCI SDK lazily so local_runner can run without it installed.
+            import oci  # type: ignore
+            from oci.streaming import StreamClient  # type: ignore
+
             try:
                 # Try to use instance principal (for OCI Functions)
                 signer = oci.auth.signers.get_resource_principals_signer()
@@ -87,6 +96,9 @@ class OCITokenStreamer(TokenStreamer):
         self._buffer[request_id] = []
 
         try:
+            # Lazy import for optional OCI dependency.
+            from oci.streaming.models import PutMessagesDetails, PutMessagesDetailsEntry  # type: ignore
+
             client = self._get_client()
             
             messages = [

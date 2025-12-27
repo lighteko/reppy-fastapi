@@ -3,11 +3,16 @@
 import base64
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import oci
-from oci.queue import QueueClient
-from oci.queue.models import PutMessagesDetails, PutMessagesDetailsEntry
+if TYPE_CHECKING:
+    import oci  # noqa: F401
+    from oci.queue import QueueClient  # noqa: F401
+    from oci.queue.models import PutMessagesDetails, PutMessagesDetailsEntry  # noqa: F401
+else:
+    QueueClient = Any  # type: ignore[assignment]
+    PutMessagesDetails = Any  # type: ignore[assignment]
+    PutMessagesDetailsEntry = Any  # type: ignore[assignment]
 
 from src.config import Settings
 from src.contracts.messages import ResultEvent
@@ -37,6 +42,10 @@ class OCIResultPublisher(ResultPublisher):
     def _get_client(self) -> QueueClient:
         """Get or create OCI Queue client."""
         if self._client is None:
+            # Import OCI SDK lazily so local_runner can run without it installed.
+            import oci  # type: ignore
+            from oci.queue import QueueClient  # type: ignore
+
             try:
                 # Try to use instance principal (for OCI Functions)
                 signer = oci.auth.signers.get_resource_principals_signer()
@@ -61,6 +70,9 @@ class OCIResultPublisher(ResultPublisher):
             event: Result event with final data.
         """
         try:
+            # Lazy import for optional OCI dependency.
+            from oci.queue.models import PutMessagesDetails, PutMessagesDetailsEntry  # type: ignore
+
             client = self._get_client()
 
             message_content = json.dumps(event.model_dump_json_compat())

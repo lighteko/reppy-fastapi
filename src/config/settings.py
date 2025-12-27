@@ -20,11 +20,11 @@ class Settings(BaseSettings):
     # Google/Gemini
     google_api_key: str = Field(..., description="Google API key for Gemini")
     gemini_model_router: str = Field(
-        default="gemini-2.0-flash",
+        default="gemini-2.5-flash",
         description="Gemini model for routing/planning (fast, cheap)",
     )
     gemini_model_main: str = Field(
-        default="gemini-2.5-pro-preview-06-05",
+        default="gemini-2.5-pro",
         description="Gemini model for main generation (powerful)",
     )
 

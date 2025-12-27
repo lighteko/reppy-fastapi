@@ -129,8 +129,8 @@ pip install -e ".[dev]"
 ```env
 # Google/Gemini
 GOOGLE_API_KEY=your-google-api-key
-GEMINI_MODEL_ROUTER=gemini-2.0-flash
-GEMINI_MODEL_MAIN=gemini-2.5-pro-preview-06-05
+GEMINI_MODEL_ROUTER=gemini-2.5-flash
+GEMINI_MODEL_MAIN=gemini-2.5-pro
 
 # Prompts
 PROMPTS_DIR=./prompts

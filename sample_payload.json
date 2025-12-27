@@ -4,11 +4,11 @@
   "conversationHistory": [
     {
       "role": "assistant",
-      "content": "안녕하세요! 오늘 운동은 어떻게 도와드릴까요?"
+      "content": "Hello, how can I help you today?"
     },
     {
       "role": "user",
-      "content": "오늘 운동 뭐야?"
+      "content": "What routine do I have today? List them all."
     }
   ],
   "stream": true,
