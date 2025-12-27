@@ -1,8 +1,9 @@
 name: Deploy to OCI Functions (OCIR)
 
 on:
-  push:
-    branches: ["main"]
+  pull_request:
+    branches: [main]
+    types: [closed]
   workflow_dispatch:
 
 concurrency:
@@ -11,10 +12,11 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write  # needed for buildx cache type=gha
 
 env:
   # ---------- OCIR ----------
-  # Example: iad.ocir.io
+  # Example: iad.ocir.io  (must match region of your Function)
   OCIR_REGISTRY: ${{ secrets.OCIR_REGION_KEY }}.ocir.io
   # Example: axxxxxx (Object Storage namespace / OCIR namespace)
   OCIR_NAMESPACE: ${{ secrets.OCIR_NAMESPACE }}
@@ -29,6 +31,9 @@ env:
 
 jobs:
   build-and-deploy:
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+      || (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
 
     steps:
@@ -37,6 +42,7 @@ jobs:
 
       - name: Compute image tag
         id: meta
+        shell: bash
         run: |
           set -euo pipefail
           SHORT_SHA="${GITHUB_SHA::12}"
@@ -51,9 +57,9 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.OCIR_REGISTRY }}
-          # Username format: <ocir-namespace>/<user> (NOT email). See OCI docs.
+          # Username format: <ocir-namespace>/<user> (NOT email)
           username: ${{ secrets.OCIR_USERNAME }}
-          # This should be an OCI Auth Token (not your console password)
+          # OCI Auth Token (not console password)
           password: ${{ secrets.OCIR_AUTH_TOKEN }}
 
       - name: Build and push image
@@ -66,38 +72,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Install OCI CLI
-        uses: oracle-actions/setup-oci-cli@v1.3.1
-        with:
-          version: "latest"
-
-      - name: Configure OCI CLI (API key)
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.oci
-          echo "${{ secrets.OCI_API_PRIVATE_KEY_PEM }}" > ~/.oci/oci_api_key.pem
-          chmod 600 ~/.oci/oci_api_key.pem
-
-          cat > ~/.oci/config <<EOF
-          [DEFAULT]
-          user=${{ secrets.OCI_USER_OCID }}
-          fingerprint=${{ secrets.OCI_FINGERPRINT }}
-          tenancy=${{ secrets.OCI_TENANCY_OCID }}
-          region=${OCI_REGION}
-          key_file=~/.oci/oci_api_key.pem
-          EOF
-
+      # OCI CLI 설치 + 인증 + 커맨드 실행을 한 번에 처리하는 Oracle 액션
       - name: Update OCI Function to new image
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Deploying image: ${{ steps.meta.outputs.image }}"
-          oci fn function update \
-            --function-id "${OCI_FUNCTION_OCID}" \
-            --image "${{ steps.meta.outputs.image }}" \
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        env:
+          OCI_CLI_USER: ${{ secrets.OCI_USER_OCID }}
+          OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_API_PRIVATE_KEY_PEM }}
+          OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
+        with:
+          command: >
+            fn function update
+            --function-id "${{ env.OCI_FUNCTION_OCID }}"
+            --image "${{ steps.meta.outputs.image }}"
             --wait-for-state ACTIVE
 
       - name: Output deployment info
+        shell: bash
         run: |
           echo "Deployed: ${{ steps.meta.outputs.image }}"
