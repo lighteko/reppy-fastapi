@@ -1,0 +1,36 @@
+{
+  "requestId": "550e8400-e29b-41d4-a716-446655440000",
+  "userId": "user-12345",
+  "conversationHistory": [
+    {
+      "role": "assistant",
+      "content": "안녕하세요! 오늘 운동은 어떻게 도와드릴까요?"
+    },
+    {
+      "role": "user",
+      "content": "오늘 운동 뭐야?"
+    }
+  ],
+  "stream": true,
+  "metadata": {
+    "source": "mobile-app",
+    "available_context": {
+      "exercises": [
+        {"exercise_code": "BARBELL_BENCH_PRESS", "main_muscle_code": "CHEST"},
+        {"exercise_code": "DUMBBELL_BENCH_PRESS", "main_muscle_code": "CHEST"},
+        {"exercise_code": "INCLINE_BENCH_PRESS", "main_muscle_code": "CHEST"},
+        {"exercise_code": "CABLE_FLY", "main_muscle_code": "CHEST"},
+        {"exercise_code": "BARBELL_OVERHEAD_PRESS", "main_muscle_code": "SHOULDERS"},
+        {"exercise_code": "LATERAL_RAISE", "main_muscle_code": "SHOULDERS"},
+        {"exercise_code": "TRICEP_PUSHDOWN", "main_muscle_code": "TRICEPS"}
+      ],
+      "set_types": [
+        {"set_type_code": "WARMUP"},
+        {"set_type_code": "NORMAL"},
+        {"set_type_code": "DROP_SET"},
+        {"set_type_code": "FAILURE"}
+      ]
+    }
+  }
+}
+

@@ -1,326 +1,310 @@
 # Reppy Worker
 
-OCI Functions 기반 LLM 파이프라인 Worker. LangChain + Gemini를 사용하여 피트니스 코칭 요청을 처리합니다.
+OCI Functions 환경에서 동작하는 AI 피트니스 코칭 Worker입니다. LangChain + Gemini를 사용하여 사용자 요청을 처리합니다.
 
 ## 아키텍처
 
 ```
-┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐
-│   OCI Queue     │────▶│    Worker    │────▶│  OCI Streaming  │
-│ (request-queue) │     │ (OCI Func)   │     │  (token-stream) │
-└─────────────────┘     └──────┬───────┘     └─────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           OCI Functions                                  │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                       Reppy Worker                                │   │
+│  │                                                                   │   │
+│  │  ┌──────────┐    ┌──────────┐    ┌──────────────────────────┐   │   │
+│  │  │  Intent  │───▶│   Chat   │───▶│  Context Aggregation     │   │   │
+│  │  │  Router  │    │ Planner  │    │  (VM API + Qdrant)       │   │   │
+│  │  └──────────┘    └──────────┘    └──────────────────────────┘   │   │
+│  │       │               │                      │                    │   │
+│  │       ▼               ▼                      ▼                    │   │
+│  │  ┌──────────────────────────────────────────────────────────┐   │   │
+│  │  │              LLM Response Generation                      │   │   │
+│  │  │         (Streaming / Structured Output)                   │   │   │
+│  │  └──────────────────────────────────────────────────────────┘   │   │
+│  │                           │                                       │   │
+│  └───────────────────────────┼───────────────────────────────────────┘   │
+│                              │                                           │
+└──────────────────────────────┼───────────────────────────────────────────┘
                                │
-                               ▼
-                        ┌──────────────┐     ┌─────────────────┐
-                        │  VM Internal │     │   Result Queue  │
-                        │     API      │     │                 │
-                        └──────────────┘     └─────────────────┘
-                               │
-                               ▼
-                        ┌──────────────┐
-                        │  PostgreSQL  │
-                        │   (via VM)   │
-                        └──────────────┘
+         ┌─────────────────────┼─────────────────────┐
+         ▼                     ▼                     ▼
+  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+  │ OCI Streaming│    │ Result Queue │    │   VM API     │
+  │ (Token Stream)│   │ (Final Result)│   │ (PostgreSQL) │
+  └──────────────┘    └──────────────┘    └──────────────┘
 ```
 
-### 핵심 제약사항
+## 주요 제약사항
 
-1. **Worker는 PostgreSQL에 직접 접근하지 않음** - VM Internal API를 통해서만 DB 조회
-2. **VectorDB(Qdrant)는 Worker에서만 접근** - 사용자 메모리 시맨틱 검색
-3. **멱등성(Idempotency)** - requestId 기준으로 VM API에서 claim 처리
+1. **Worker는 PostgreSQL에 직접 접근하지 않음** - VM의 Internal API를 통해서만 DB 데이터 조회
+2. **VectorDB(Qdrant)는 Worker에서만 접근** - User Memory 검색용
+3. **멱등성 보장** - 요청 처리 전 VM API를 통해 claim 시도, 실패 시 스킵
 
 ## 프로젝트 구조
 
 ```
 reppy-worker/
 ├── prompts/                    # LLM 프롬프트 YAML 파일
-│   ├── action_routing.yaml     # 인텐트 라우팅
-│   ├── chat_planner.yaml       # 채팅 계획 수립
-│   ├── chat_response.yaml      # 채팅 응답 생성
-│   ├── generate_program.yaml   # 프로그램 생성
-│   └── update_routine.yaml     # 루틴 수정
-├── src/worker/
-│   ├── config/                 # 설정 (pydantic-settings)
-│   ├── contracts/              # Pydantic 스키마/모델
-│   ├── context/                # 컨텍스트 페칭
-│   │   ├── ports/              # 추상 인터페이스
-│   │   └── adapters/           # 구현체 (VM API, Qdrant)
-│   ├── emit/                   # 이벤트 발행
-│   │   ├── ports/              # 추상 인터페이스
-│   │   └── adapters/           # 구현체 (OCI Streaming, Queue)
+│   ├── intent_routing.yaml
+│   ├── chat_planner.yaml
+│   ├── chat_response.yaml
+│   ├── generate_program.yaml
+│   └── update_routine.yaml
+│
+├── src/
+│   ├── config/                 # pydantic-settings 기반 설정
+│   │   └── settings.py
+│   │
+│   ├── contracts/              # Pydantic 스키마/메시지 정의
+│   │   ├── schemas.py          # LLM 출력 스키마
+│   │   └── messages.py         # 입출력 메시지 계약
+│   │
+│   ├── context/                # 컨텍스트 조회 (Ports & Adapters)
+│   │   ├── ports/              # 인터페이스 정의
+│   │   │   └── interfaces.py
+│   │   └── adapters/           # 구현체
+│   │       ├── vm_client.py    # VM Internal API 클라이언트
+│   │       ├── qdrant_adapter.py
+│   │       └── aggregator.py   # 컨텍스트 통합
+│   │
+│   ├── emit/                   # 결과 발행
+│   │   ├── ports.py            # TokenStreamer, ResultPublisher 인터페이스
+│   │   ├── oci_streaming.py    # OCI Streaming 어댑터
+│   │   └── result_queue.py     # OCI Queue 어댑터
+│   │
 │   ├── llm/                    # LLM 통합
-│   │   ├── prompt_loader.py    # 프롬프트 로더
-│   │   ├── gemini_client.py    # Gemini LangChain 클라이언트
-│   │   └── structured_output.py# 구조화된 출력 파서
-│   ├── pipelines/              # 파이프라인
-│   │   ├── orchestrator.py     # 메인 오케스트레이터
-│   │   ├── chat_pipeline.py    # CHAT_RESPONSE 처리
-│   │   ├── generate_pipeline.py# GENERATE_ROUTINE 처리
-│   │   └── update_pipeline.py  # UPDATE_ROUTINE 처리
-│   ├── entrypoints/            # 진입점
-│   │   ├── oci_function.py     # OCI Functions 핸들러
-│   │   └── local_runner.py     # 로컬 실행기
-│   └── utils/                  # 유틸리티
-└── tests/                      # 테스트
+│   │   └── gemini.py           # LangChain + Gemini 클라이언트
+│   │
+│   ├── pipelines/              # 처리 파이프라인
+│   │   ├── orchestrator.py     # 전체 흐름 조율
+│   │   ├── router.py           # Intent 라우팅
+│   │   ├── chat_pipeline.py    # 채팅 응답 파이프라인
+│   │   ├── generate_pipeline.py # 프로그램 생성
+│   │   └── update_pipeline.py  # 루틴 업데이트
+│   │
+│   ├── utils/                  # 유틸리티
+│   │   ├── logging.py          # 로깅 설정
+│   │   └── prompt_loader.py    # 프롬프트 로더
+│   │
+│   └── entrypoints/            # 진입점
+│       ├── oci_function.py     # OCI Functions 핸들러
+│       └── local_runner.py     # 로컬 테스트용
+│
+├── tests/                      # 테스트
+│   ├── test_schemas.py
+│   └── test_planner_context.py
+│
+├── pyproject.toml
+├── requirements.txt
+└── README.md
 ```
 
 ## 설치
 
+### 요구사항
+
+- Python 3.11+
+- Google API Key (Gemini)
+- OCI 계정 및 설정
+
+### 의존성 설치
+
 ```bash
-# Python 3.11+ 필요
+# 가상환경 생성
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# 또는
+.venv\Scripts\activate  # Windows
+
+# 의존성 설치
 pip install -e .
 
 # 개발 의존성 포함
 pip install -e ".[dev]"
-
-# OCI SDK 포함 (프로덕션)
-pip install -e ".[oci]"
 ```
 
-## 환경 변수
+## 환경 설정
 
-`.env` 파일을 생성하거나 환경 변수를 설정합니다:
+`.env` 파일을 생성하고 다음 환경변수를 설정합니다:
 
-```bash
-# Google/Gemini API
+```env
+# Google/Gemini
 GOOGLE_API_KEY=your-google-api-key
-GEMINI_MODEL_ROUTER=gemini-2.5-flash    # 라우터/플래너용 (비용 절감)
-GEMINI_MODEL_MAIN=gemini-2.5-pro        # 메인 생성용
+GEMINI_MODEL_ROUTER=gemini-2.0-flash
+GEMINI_MODEL_MAIN=gemini-2.5-pro-preview-06-05
 
 # Prompts
 PROMPTS_DIR=./prompts
 
 # VM Internal API
 VM_INTERNAL_BASE_URL=http://10.0.0.10:8080/internal
-VM_INTERNAL_TOKEN=your-internal-token
+VM_INTERNAL_TOKEN=your-internal-api-token
 
 # Qdrant
-QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=                          # optional
+QDRANT_URL=http://qdrant:6333
+QDRANT_API_KEY=optional-api-key
 QDRANT_COLLECTION_MEMORY=user_memory
 
 # OCI
-OCI_STREAM_ID=your-stream-ocid
-OCI_RESULT_QUEUE_ID=your-queue-ocid
+OCI_STREAM_ID=ocid1.stream.oc1...
+OCI_RESULT_QUEUE_ID=ocid1.queue.oc1...
 
 # Logging
 LOG_LEVEL=INFO
 ```
 
-## 실행
+## 사용법
 
 ### 로컬 실행
 
 ```bash
 # JSON 파일로 실행
-python -m src.worker.entrypoints.local_runner -f request.json
+python -m src.entrypoints.local_runner -f payload.json
 
-# JSON 문자열로 실행
-python -m src.worker.entrypoints.local_runner -j '{"requestId": "test-123", ...}'
+# 인라인 JSON으로 실행
+python -m src.entrypoints.local_runner -j '{"requestId": "...", ...}'
 
-# stdin에서 읽기
-cat request.json | python -m src.worker.entrypoints.local_runner
-
-# 예제 페이로드로 실행
-python -m src.worker.entrypoints.local_runner --example
+# stdin으로 실행
+cat payload.json | python -m src.entrypoints.local_runner
 ```
 
-### 예제 요청 페이로드
+### 샘플 페이로드
 
 ```json
 {
-  "requestId": "req-12345",
-  "userId": "user-67890",
-  "conversation_history": [
-    {"role": "user", "content": "오늘 운동 뭐 해야 돼?"}
+  "requestId": "550e8400-e29b-41d4-a716-446655440000",
+  "userId": "user123",
+  "conversationHistory": [
+    {"role": "user", "content": "오늘 운동 뭐야?"}
   ],
   "stream": true,
   "metadata": {}
 }
 ```
 
-### OCI Function 배포
+### OCI Functions 배포
 
 ```bash
-# func.yaml 설정 후
+# Docker 이미지 빌드
+fn build
+
+# 배포
 fn deploy --app your-app-name
+
+# 테스트 호출
+echo '{"requestId": "test", ...}' | fn invoke your-app-name worker-function
 ```
-
-## 파이프라인 흐름
-
-### 1. Intent Routing
-
-```
-Request → intent_routing.yaml → Intent (CHAT_RESPONSE | GENERATE_ROUTINE | UPDATE_ROUTINE)
-```
-
-### 2. CHAT_RESPONSE 파이프라인
-
-```
-Intent=CHAT_RESPONSE
-    ↓
-chat_planner.yaml (Flash model)
-    ↓
-Context Aggregation (based on required_context)
-    ├─ active_routines → VM API
-    ├─ user_memory → Qdrant
-    └─ exercise_catalog → VM API
-    ↓
-chat_response.yaml (Pro model, optional streaming)
-    ↓
-Result → result-queue
-```
-
-### 3. GENERATE_ROUTINE 파이프라인
-
-```
-Intent=GENERATE_ROUTINE
-    ↓
-Fetch active_routines (baseline)
-    ↓
-generate_program.yaml (Pro model)
-    ↓
-Result → result-queue
-```
-
-### 4. UPDATE_ROUTINE 파이프라인
-
-```
-Intent=UPDATE_ROUTINE
-    ↓
-Fetch active_routines (find routine to update)
-    ↓
-update_routine.yaml (Pro model)
-    ↓
-Result → result-queue
-```
-
-## 결과 이벤트 형식
-
-### Token Stream Event (실시간 토큰)
-
-```json
-{
-  "requestId": "req-12345",
-  "seq": 1,
-  "delta": "안녕",
-  "ts": 1703123456789
-}
-```
-
-### Result Event (최종 결과)
-
-```json
-{
-  "requestId": "req-12345",
-  "status": "SUCCEEDED",
-  "final": {
-    "reply": "오늘은 푸쉬데이입니다! 벤치프레스부터 시작해볼까요?"
-  },
-  "error": null,
-  "usage": {},
-  "meta": {
-    "intent": "CHAT_RESPONSE",
-    "action": "GET_ACTIVE_ROUTINES",
-    "confidence": 0.95
-  }
-}
-```
-
-### Status 값
-
-- `SUCCEEDED`: 성공적으로 처리됨
-- `FAILED`: 오류 발생
-- `CLARIFY`: 추가 정보 필요 (clarification question 포함)
 
 ## 테스트
 
 ```bash
-# 모든 테스트 실행
+# 전체 테스트 실행
 pytest
 
 # 커버리지 포함
-pytest --cov=src/worker
+pytest --cov=src --cov-report=html
 
-# 특정 테스트만
+# 특정 테스트 실행
 pytest tests/test_schemas.py -v
 ```
 
+## LLM 파이프라인 흐름
+
+### 1. Intent Routing
+
+사용자 메시지를 분류하여 적절한 핸들러로 라우팅합니다.
+
+- `CHAT_RESPONSE`: 일반 대화, 질문, 설명
+- `GENERATE_ROUTINE`: 새 루틴/프로그램 생성
+- `UPDATE_ROUTINE`: 기존 루틴 수정
+
+### 2. Chat Response 파이프라인
+
+```
+Intent: CHAT_RESPONSE
+    │
+    ▼
+┌──────────────────┐
+│   Chat Planner   │  ← Router 모델 (Flash)
+│  - 액션 결정     │
+│  - 필요 컨텍스트 │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ Context Aggregation │
+│  - active_routines  │ ← VM API
+│  - user_memory      │ ← Qdrant
+│  - exercise_catalog │ ← VM API
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Chat Responder  │  ← Main 모델 (Pro)
+│  - 최종 응답 생성 │
+│  - 스트리밍 지원  │
+└──────────────────┘
+```
+
+### 3. Structured Output
+
+모든 LLM 출력은 Pydantic 모델로 강제 파싱됩니다:
+
+- `IntentRoutingOutput`: 라우팅 결과
+- `ChatPlannerOutput`: 플래닝 결과
+- `ChatResponseOutput`: 응답 결과
+- `GenerateProgramOutput`: 생성된 프로그램
+- `UpdateRoutineOutput`: 업데이트된 루틴
+
+파싱 실패 시:
+- Router/Planner: `CHAT_RESPONSE` + `ASK_CLARIFY`로 폴백
+- Generate/Update: `FAILED` 상태로 결과 발행
+
 ## VM Internal API 계약
 
-모든 요청에 `Authorization: Bearer <VM_INTERNAL_TOKEN>` 헤더 필요.
+Worker가 호출하는 VM API 엔드포인트:
 
 ### POST /idempotency/claim
-
 ```json
 // Request
-{ "requestId": "<uuid>" }
-
+{"requestId": "uuid"}
 // Response
-{ "claimed": true }  // or false
+{"claimed": true|false}
 ```
 
 ### GET /users/{userId}/profile
-
-```json
-// Response
-{
-  "username": "Alex",
-  "experience_level": "INTERMEDIATE",
-  "goal": "HYPERTROPHY",
-  ...
-}
-```
+사용자 프로필 JSON 반환
 
 ### GET /users/{userId}/active-routines
-
-```json
-// Response
-{
-  "routines": [
-    {
-      "routine_name": "Push Day A",
-      "routine_order": 1,
-      "plans": [...]
-    }
-  ]
-}
-```
+활성 루틴 목록 JSON 반환
 
 ### GET /exercises/search?q=...
+운동 검색 결과 JSON 반환
 
+## 메시지 계약
+
+### Token Stream Event (OCI Streaming)
 ```json
-// Response
 {
-  "items": [
-    {
-      "exercise_code": "BARBELL_BENCH_PRESS",
-      "main_muscle_code": "CHEST",
-      ...
-    }
-  ]
+  "requestId": "uuid",
+  "seq": 1,
+  "delta": "text",
+  "ts": 1234567890
 }
 ```
 
-## 개발 노트
-
-### 모델 선택 전략
-
-- **Router/Planner**: `gemini-2.5-flash` (빠르고 저렴)
-- **Main Generation**: `gemini-2.5-pro` (고품질 출력)
-
-### 멱등성 처리
-
-1. 요청 처리 시작 전 `/idempotency/claim` 호출
-2. `claimed=false`면 처리 스킵 (이미 처리 중/완료)
-3. 중복 처리 방지 및 재시도 안전성 보장
-
-### 에러 처리 전략
-
-- **라우터/플래너 파싱 실패**: fallback 스키마 사용, CLARIFY 상태로 응답
-- **프로그램/루틴 생성 실패**: FAILED 상태로 에러 정보 포함
+### Result Event (Result Queue)
+```json
+{
+  "requestId": "uuid",
+  "status": "SUCCEEDED|FAILED|CLARIFY",
+  "final": {"reply": "..."} | {"routines": [...]},
+  "error": {"code": "...", "message": "..."} | null,
+  "usage": {...},
+  "meta": {"intent": "...", "action": "...", "confidence": 0.0}
+}
+```
 
 ## 라이선스
 
-MIT
+MIT License
 

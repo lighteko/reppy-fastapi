@@ -1,0 +1,8 @@
+# OCI Functions configuration
+schema_version: 20180708
+name: reppy-worker
+version: 0.1.0
+runtime: docker
+memory: 512
+timeout: 300
+

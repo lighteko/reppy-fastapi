@@ -1,2 +1,2 @@
-"""Tests for Reppy Worker."""
+"""Test suite for Reppy Worker."""
 
