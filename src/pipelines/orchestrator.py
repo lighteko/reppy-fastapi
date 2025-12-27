@@ -206,7 +206,13 @@ class PipelineOrchestrator:
             )
 
         except ValueError as e:
-            await self._publish_error(payload.request_id, str(e))
+            await self._publish_error(
+                payload.request_id,
+                str(e),
+                intent=IntentType.GENERATE_ROUTINE.value,
+                action="generate_program",
+                confidence=getattr(routing, "confidence", 0.0),
+            )
 
     async def _handle_update(
         self,
@@ -227,6 +233,9 @@ class PipelineOrchestrator:
                     await self._publish_error(
                         payload.request_id,
                         "No active routine found to update",
+                        intent=IntentType.UPDATE_ROUTINE.value,
+                        action="update_routine",
+                        confidence=getattr(routing, "confidence", 0.0),
                     )
                     return
 
@@ -266,7 +275,13 @@ class PipelineOrchestrator:
             )
 
         except ValueError as e:
-            await self._publish_error(payload.request_id, str(e))
+            await self._publish_error(
+                payload.request_id,
+                str(e),
+                intent=IntentType.UPDATE_ROUTINE.value,
+                action="update_routine",
+                confidence=getattr(routing, "confidence", 0.0),
+            )
 
     async def _publish_clarification(
         self,
@@ -288,14 +303,22 @@ class PipelineOrchestrator:
             )
         )
 
-    async def _publish_error(self, request_id: str, message: str) -> None:
+    async def _publish_error(
+        self,
+        request_id: str,
+        message: str,
+        *,
+        intent: str = "",
+        action: str = "",
+        confidence: float = 0.0,
+    ) -> None:
         """Publish an error result."""
         await self._publisher.publish(
             ResultEvent(
                 request_id=request_id,
                 status=ResultStatus.FAILED,
                 error={"code": "PIPELINE_ERROR", "message": message},
-                meta=ResultMeta(),
+                meta=ResultMeta(intent=intent, action=action, confidence=confidence),
             )
         )
 

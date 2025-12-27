@@ -8,7 +8,7 @@
     },
     {
       "role": "user",
-      "content": "What routine do I have today? List them all."
+      "content": "Could you generate a 3 days split routine for me?"
     }
   ],
   "stream": true,

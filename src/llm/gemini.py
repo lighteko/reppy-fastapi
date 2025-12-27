@@ -117,8 +117,19 @@ class GeminiClient:
                 return parser.parse(content_text)
 
         except ValidationError as e:
+            # One repair attempt: ask the model to fix the JSON to match schema exactly.
             logger.error(f"Validation error parsing LLM output: {e}")
-            raise ValueError(f"Failed to parse LLM output: {e}") from e
+            try:
+                repaired = await self._repair_structured_output(
+                    model=model,
+                    system_prompt=system_prompt,
+                    instruction=instruction,
+                    output_model=output_model,
+                    raw_output=content_text,
+                )
+                return repaired
+            except Exception as repair_err:
+                raise ValueError(f"Failed to parse LLM output: {e}") from repair_err
 
     async def invoke_streaming(
         self,
@@ -233,6 +244,44 @@ class GeminiClient:
             return "".join(parts)
         # Fallback: stringify
         return str(content)
+
+    async def _repair_structured_output(
+        self,
+        model: ChatGoogleGenerativeAI,
+        system_prompt: str,
+        instruction: str,
+        output_model: type[T],
+        raw_output: str,
+    ) -> T:
+        """
+        Attempt to repair a near-miss structured output by re-asking the model to strictly conform.
+
+        This is intentionally limited to a single retry to avoid runaway costs.
+        """
+        schema = json.dumps(output_model.model_json_schema(), ensure_ascii=False, indent=2)
+        repair_prompt = (
+            "Your previous output did not match the required JSON schema.\n"
+            "Return ONLY a single raw JSON object that strictly matches the schema.\n\n"
+            "SCHEMA:\n"
+            f"{schema}\n\n"
+            "PREVIOUS_OUTPUT:\n"
+            f"{raw_output}\n\n"
+            "IMPORTANT:\n"
+            "- Do not add any commentary.\n"
+            "- Do not wrap in markdown.\n"
+            "- Do not omit required fields.\n"
+        )
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=instruction),
+            HumanMessage(content=repair_prompt),
+        ]
+
+        response: AIMessage = await model.ainvoke(messages)
+        content_text = self._clean_json_response(self._content_to_text(response.content))
+        data = json.loads(content_text)
+        return output_model.model_validate(data)
 
 
 class StreamingCollector[T: BaseModel]:

@@ -277,7 +277,7 @@ response_schema:
                       reps:
                         type: integer
                       weight:
-                        type: number
+                        type: integer
                         description: "Weight in the user's preferred unit system."
                       rest_time:
                         type: integer

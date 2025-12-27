@@ -15,6 +15,7 @@ from src.emit.oci_streaming import LocalTokenStreamer
 from src.emit.result_queue import LocalResultPublisher
 from src.pipelines.orchestrator import PipelineOrchestrator
 from src.utils.logging import configure_logging
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,8 @@ def create_mock_settings() -> Settings:
     os.environ.setdefault("OCI_STREAM_ID", "local-stream")
     os.environ.setdefault("OCI_RESULT_QUEUE_ID", "local-queue")
     os.environ.setdefault("LOG_LEVEL", "DEBUG")
+    
+    load_dotenv(override=True)
     
     return Settings()  # type: ignore[call-arg]
 
